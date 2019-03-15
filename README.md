@@ -34,7 +34,7 @@ query getRestrictedDadJoke {
   tellMeADadJoke
 }
 
-mutation {
+mutation signup {
   signup(organization: "123", id: "newUserId", name: "Tyler Buchea") {
     name
   }
