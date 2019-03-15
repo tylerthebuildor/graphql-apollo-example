@@ -1,6 +1,8 @@
 const { ApolloServer, gql } = require('apollo-server');
 const jwt = require('jsonwebtoken');
 
+const JWT_SECRET = 'makethislongandrandom';
+
 // This could also be MongoDB, PostgreSQL, etc
 const db = {
   users: [
@@ -55,11 +57,8 @@ const server = new ApolloServer({
     let user = null;
     try {
       const token = req.headers.authorization.replace('Bearer ', '');
-      const secret = 'makethislongandrandom';
-      user = jwt.verify(token, secret);
-    } catch (error) {
-      console.log(error);
-    }
+      user = jwt.verify(token, JWT_SECRET);
+    } catch (error) {}
     return { user };
   },
   typeDefs: gql`
@@ -67,7 +66,7 @@ const server = new ApolloServer({
       signup(organization: String, id: String, name: String): User
     }
     type Query {
-      login(username: String, password: String): String
+      login(username: String): String
       tellMeADadJoke: String
       users: [User]
       user(id: ID!): User
@@ -83,13 +82,12 @@ const server = new ApolloServer({
       users: [User]
       id: ID
       name: String
-      phone: String
     }
   `,
   resolvers: {
     Mutation: {
-      signup(parent, { organization, id, name, password }) {
-        const user = { organization, id, name, password };
+      signup(parent, { organization, id, name }) {
+        const user = { organization, id, name };
         const match = db.users.find(user => user.name === name);
         if (match) throw Error('This username already exists');
         db.users.push(user);
@@ -97,13 +95,12 @@ const server = new ApolloServer({
       },
     },
     Query: {
-      login(parent, { username, password }) {
+      login(parent, { username }) {
         const user = db.users.find(user => user.name === username);
-        const incorrectPassword = user.password !== password;
-        if (!user || incorrectPassword) {
-          throw Error('username or password was incorrect');
+        if (!user) {
+          throw Error('username was incorrect');
         }
-        const token = jwt.sign({ id: user.id }, jwtSecret);
+        const token = jwt.sign({ id: user.id }, JWT_SECRET);
         return token;
       },
       tellMeADadJoke(parent, data, { user }) {
