@@ -21,37 +21,6 @@ const db = {
   ],
 };
 
-class User {
-  constructor({ organization, id, name }) {
-    this.organizationId = organization;
-    this.id = id;
-    this.name = name;
-  }
-
-  organization() {
-    const organization = db.organizations.find(
-      ({ id }) => id === this.organizationId
-    );
-    return new Organization(organization);
-  }
-}
-
-class Organization {
-  constructor({ users, id, name }) {
-    this.userIds = users;
-    this.id = id;
-    this.name = name;
-  }
-
-  // async method
-  async users() {
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    return db.users
-      .filter(({ id }) => this.userIds.includes(id))
-      .map(user => new User(user));
-  }
-}
-
 const server = new ApolloServer({
   context: ({ req }) => {
     let user = null;
@@ -86,16 +55,16 @@ const server = new ApolloServer({
   `,
   resolvers: {
     Mutation: {
-      signup(parent, { organization, id, name }) {
+      signup(_, { organization, id, name }) {
         const user = { organization, id, name };
         const match = db.users.find(user => user.name === name);
         if (match) throw Error('This username already exists');
         db.users.push(user);
-        return new User(user);
+        return user;
       },
     },
     Query: {
-      login(parent, { username }) {
+      login(_, { username }) {
         const user = db.users.find(user => user.name === username);
         if (!user) {
           throw Error('username was incorrect');
@@ -103,27 +72,27 @@ const server = new ApolloServer({
         const token = jwt.sign({ id: user.id }, JWT_SECRET);
         return token;
       },
-      tellMeADadJoke(parent, data, { user }) {
+      tellMeADadJoke(_, data, { user }) {
         if (!user) throw Error('not authorized');
         return 'If you see a robbery at an Apple Store does that make you an iWitness?';
       },
-      users() {
-        return db.users.map(user => new User(user));
-      },
-      user(parent, { id }) {
-        return new User(db.users.find(user => user.id === id));
-      },
-      organizations() {
-        return db.organizations.map(
-          organization => new Organization(organization)
+      users: () => db.users,
+      user: (_, { id }) => db.users.find(user => user.id === id),
+      organizations: () => db.organizations,
+      organization: (_, { id }) =>
+        db.organizations.find(organization => organization.id === id),
+    },
+    User: {
+      organization: parent =>
+        db.organizations.find(({ id }) => parent.organizationId === id),
+    },
+    Organization: {
+      async users(parent) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const organization = db.users.filter(({ id }) =>
+          parent.userIds.includes(id)
         );
-      },
-      organization(parent, { id }) {
-        const organization = db.organizations.find(
-          organization => organization.id === id
-        );
-
-        return new Organization(organization);
+        return organization;
       },
     },
   },
